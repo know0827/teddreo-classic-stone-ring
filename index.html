@@ -1893,7 +1893,7 @@ function sectionBody(id){
           <button class="act" onclick="downloadDesignPhoto()">下載我的設計圖</button>
         </div>
         <div class="action-row">
-          <button class="act primary" id="submitDesignBtn" onclick="submitDesignByEmail()">送出設計圖</button>
+                      <button class="act primary" id="submitDesignBtn" onclick="submitDesignByEmail()">確認訂單，送出設計圖</button>
         </div>
         <p class="notice" id="submitStatusMsg" style="display:none;"></p>
         <div class="action-row">
@@ -2485,11 +2485,11 @@ async function submitDesignByEmail(){
     /* 產生設計圖,並壓縮成較小的 JPEG,避免信件超過免費方案的大小上限 */
     const canvas = buildDesignPhotoCanvas();
     const smallCanvas = document.createElement('canvas');
-    const scale = 480 / canvas.width;
-    smallCanvas.width = 480;
+    const scale = 800 / canvas.width;
+    smallCanvas.width = 800;
     smallCanvas.height = Math.round(canvas.height * scale);
     smallCanvas.getContext('2d').drawImage(canvas, 0, 0, smallCanvas.width, smallCanvas.height);
-    const imgDataUrl = smallCanvas.toDataURL('image/jpeg', 0.7);
+        const imgDataUrl = smallCanvas.toDataURL('image/jpeg', 0.85);
     const designImageHtml = `<img src="${imgDataUrl}" alt="設計圖" style="max-width:100%;border-radius:8px;" />`;
 
     const now = new Date();
