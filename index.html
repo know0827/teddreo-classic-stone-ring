@@ -2485,11 +2485,11 @@ async function submitDesignByEmail(){
     /* 產生設計圖,並壓縮成較小的 JPEG,避免信件超過免費方案的大小上限 */
     const canvas = buildDesignPhotoCanvas();
     const smallCanvas = document.createElement('canvas');
-    const scale = 800 / canvas.width;
-    smallCanvas.width = 800;
+    const scale = 700 / canvas.width;
+    smallCanvas.width = 700;
     smallCanvas.height = Math.round(canvas.height * scale);
     smallCanvas.getContext('2d').drawImage(canvas, 0, 0, smallCanvas.width, smallCanvas.height);
-        const imgDataUrl = smallCanvas.toDataURL('image/jpeg', 0.85);
+            const imgDataUrl = smallCanvas.toDataURL('image/jpeg', 0.75);
     const designImageHtml = `<img src="${imgDataUrl}" alt="設計圖" style="max-width:100%;border-radius:8px;" />`;
 
     const now = new Date();
