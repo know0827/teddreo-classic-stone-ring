@@ -2485,7 +2485,11 @@ async function submitDesignByLine(){
     const now = new Date();
     const orderNumber = BRAND_NAME.toUpperCase() + '-' + now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0') + '-' + String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0') + String(now.getSeconds()).padStart(2,'0');
     const orderTime = now.toLocaleString('zh-TW', { hour12:false });
-
+const engFontName = k => (ENGRAVE_FONTS.find(f=>f.key===k)||{}).name || k;
+      const engColorName = c => c==='black' ? '黑色' : '銀色';
+      const engraveInner = state.engraveInnerOn ? (state.engraveInnerText || '(未填寫)') + '（' + engFontName(state.engraveInnerFont) + '・' + engColorName(state.engraveInnerColor) + '）' : '';
+      const engraveOuter = state.engraveOuterOn ? (state.engraveOuterText || '(未填寫)') + '（' + engFontName(state.engraveOuterFont) + '・' + engColorName(state.engraveOuterColor) + '）' : '';
+      const engraveSide = state.engraveSideOn ? (state.engraveSideText || '(未填寫)') + '（' + engFontName(state.engraveSideFont) + '・' + engColorName(state.engraveSideColor) + '）' : '';
     const payload = {
       site: SITE_NAME,
       product_name: BRAND_NAME,
@@ -2498,8 +2502,9 @@ async function submitDesignByLine(){
       finish_name: finishInfo.name,
       gem_name: state.gemEmbed ? (gemInfo.name + '・' + gemPosInfo.name) : '不鑲嵌寶石',
       ring_size: state.ringSize ? (state.ringSize + ' 號') : '(尚未填寫)',
-      engrave_summary: engraveSummaryText(),
-      font_summary: fontSummaryText(),
+      engrave_inner: engraveInner,
+      engrave_outer: engraveOuter,
+      engrave_side: engraveSide,
       image_base64: imgDataUrl
     };
 
