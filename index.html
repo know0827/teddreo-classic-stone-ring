@@ -525,7 +525,6 @@ button.next-step:focus-visible{outline:2px solid var(--gold);outline-offset:2px;
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script>
 /* ============ 商品與價格設定區(店家可自行修改) ============ */
 const BRAND_NAME = "teddreo";
@@ -683,20 +682,13 @@ const ENGRAVE_MAX_CHARS = 20;
 const BANK_INFO = { bank:'(請填入銀行名稱)', branch:'(請填入分行名稱)', account:'(請填入戶名)', number:'(請填入帳號)' };
 const LINE_URL = 'https://reurl.cc/lYZj09';
 
-/* ---------- EmailJS 設定 ----------
-   已連接你的 EmailJS 帳號(teddreo),使用「Contact Us」範本(template_3uul1o5,內容已改為戒指訂單通知信)。
-   範本內文使用的變數:order_number、order_time、product_name、customer_name、customer_phone、
-   shape_name、width_mm、finish_name、gem_name、ring_size、engrave_summary、font_summary、
-   design_image_html(設計圖以 <img> 內嵌 HTML 方式呈現,非附件)、recipient_role、to_email。
-   目前寄件與收件都使用 teddreo.tw@gmail.com:Service(service_vqgio49)已連接該 Gmail 帳號,
-   STUDIO_EMAIL(收件信箱)也設為同一組地址。
-   若之後想換收件信箱、調整範本文字或欄位,直接到 dashboard.emailjs.com 修改範本內容即可,
-   不需要改這裡的程式碼(除非要新增/移除變數)。                                          */
-const EMAILJS_PUBLIC_KEY  = 'ufep6e87nMwOpIZzs';
-const EMAILJS_SERVICE_ID  = 'service_vqgio49';
-const EMAILJS_TEMPLATE_ID = 'template_3uul1o5';
-const STUDIO_EMAIL = 'teddreo.tw@gmail.com';
-/* =========================================================== */
+/* ---------- LINE 通知設定 ----------
+   顧客送出設計圖時,會呼叫 Cloudflare Worker,由 Worker 負責把設計圖存到 R2、
+   並推播訂單通知訊息到 teddreo 的 LINE(帳號:Teddreo)。
+   若之後想調整訊息內容或收件對象,到 Cloudflare Worker(twilight-credit-6e90)後台修改即可,
+   不需要改這裡的程式碼(除非要換 Worker 網址)。                                        */
+const LINE_WORKER_URL = 'https://twilight-credit-6e90.teddreo-tw.workers.dev/notify';
+const SITE_NAME = 'teddreo-classic-stone-ring';
 
 /* 螢幕尺寸校正比例:讓寬度色條在使用者自己的裝置上顯示接近真實物理大小,
    預設 1(不調整),校正後的比例存在 localStorage,同一裝置/瀏覽器下次開啟仍會沿用 */
@@ -1888,12 +1880,12 @@ function sectionBody(id){
       </div>
       <div class="card" id="reportOrderCard" style="${(state.customerName.trim() && state.customerPhone.trim()) ? '' : 'display:none;'}">
         <h3>回報訂單</h3>
-        <p class="notice">點擊「送出設計圖」會自動將設計圖與訂單資訊寄送 Email 通知我們,並顯示送出結果;若尚未填寫姓名電話,系統會提醒您先填寫。您也可以改用下方「複製並前往 LINE」的方式回報。</p>
+                <p class="notice">點擊「確認訂單，送出設計圖」會自動將設計圖與訂單資訊透過 LINE 通知我們，並顯示送出結果；若尚未填寫姓名電話，系統會提醒您先填寫。您也可以改用下方「一鍵複製並前往 LINE」的方式回報。</p>
         <div class="action-row">
           <button class="act" onclick="downloadDesignPhoto()">下載我的設計圖</button>
         </div>
         <div class="action-row">
-                      <button class="act primary" id="submitDesignBtn" onclick="submitDesignByEmail()">確認訂單，送出設計圖</button>
+                      <button class="act primary" id="submitDesignBtn" onclick="submitDesignByLine()">確認訂單，送出設計圖</button>
         </div>
         <p class="notice" id="submitStatusMsg" style="display:none;"></p>
         <div class="action-row">
@@ -2449,12 +2441,12 @@ function setSubmitStatus(msg, tone){
   el.style.color = tone==='error' ? 'var(--danger)' : (tone==='ok' ? '#4a7a5c' : 'var(--ink-soft)');
 }
 
-/* 一鍵送出設計圖:驗證姓名/電話 -> 產生設計圖(壓縮成內嵌圖片 HTML)-> 透過 EmailJS 寄出訂單通知信
-   範本(template_ublu3ud)使用 emailjs.send() 搭配一般參數物件,設計圖以 {{{design_image_html}}}
-   內嵌 <img> 呈現(免費方案不支援附件,且免費方案單封信大小上限約 50KB,故將圖片壓縮處理)。 */
-async function submitDesignByEmail(){
+/* 一鍵送出設計圖：驗證姓名/電話 -> 產生設計圖(壓縮成較小的 JPEG) -> 呼叫 Cloudflare Worker，
+   由 Worker 負責把圖片存到 R2、並推播訂單通知(含文字資訊與圖片)到 teddreo 的 LINE。 */
+async function submitDesignByLine(){
   const name = state.customerName.trim();
   const phone = state.customerPhone.trim();
+
   if(!name){
     setSubmitStatus('請先填寫姓名(需與訂單收件人相符)後再送出', 'error');
     document.getElementById('customerNameInput').focus();
@@ -2466,7 +2458,7 @@ async function submitDesignByEmail(){
     return;
   }
   if(!renderer || !scene || !camera){
-    setSubmitStatus('3D 預覽尚未載入完成,請稍候再試', 'error');
+    setSubmitStatus('3D 預覽尚未載入完成，請稍候再試', 'error');
     return;
   }
 
@@ -2474,7 +2466,7 @@ async function submitDesignByEmail(){
   const origLabel = btn.textContent;
   btn.disabled = true;
   btn.textContent = '傳送中...';
-  setSubmitStatus('正在產生設計圖並寄送 Email,請稍候...', null);
+  setSubmitStatus('正在產生設計圖並傳送，請稍候...', null);
 
   try{
     const shapeInfo = SHAPES.find(s=>s.key===state.shape);
@@ -2482,50 +2474,54 @@ async function submitDesignByEmail(){
     const gemInfo = state.gemEmbed ? GEM_COLORS.find(g=>g.key===state.gemColor) : null;
     const gemPosInfo = state.gemEmbed ? GEM_POSITIONS.find(p=>p.key===state.gemPosition) : null;
 
-    /* 產生設計圖,並壓縮成較小的 JPEG,避免信件超過免費方案的大小上限 */
     const canvas = buildDesignPhotoCanvas();
     const smallCanvas = document.createElement('canvas');
     const scale = 700 / canvas.width;
     smallCanvas.width = 700;
     smallCanvas.height = Math.round(canvas.height * scale);
     smallCanvas.getContext('2d').drawImage(canvas, 0, 0, smallCanvas.width, smallCanvas.height);
-            const imgDataUrl = smallCanvas.toDataURL('image/jpeg', 0.75);
-    const designImageHtml = `<img src="${imgDataUrl}" alt="設計圖" style="max-width:100%;border-radius:8px;" />`;
+    const imgDataUrl = smallCanvas.toDataURL('image/jpeg', 0.85);
 
     const now = new Date();
-    const orderNumber = `${BRAND_NAME.toUpperCase()}-${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}-${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}${String(now.getSeconds()).padStart(2,'0')}`;
+    const orderNumber = BRAND_NAME.toUpperCase() + '-' + now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0') + '-' + String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0') + String(now.getSeconds()).padStart(2,'0');
     const orderTime = now.toLocaleString('zh-TW', { hour12:false });
 
-    const templateParams = {
-      to_email: STUDIO_EMAIL,
+    const payload = {
+      site: SITE_NAME,
+      product_name: BRAND_NAME,
       order_number: orderNumber,
       order_time: orderTime,
-      product_name: BRAND_NAME,
       customer_name: name,
       customer_phone: phone,
       shape_name: shapeInfo.name,
-      width_mm: `${state.width}mm`,
+      width_mm: state.width + 'mm',
       finish_name: finishInfo.name,
-      gem_name: state.gemEmbed ? `${gemInfo.name}・${gemPosInfo.name}` : '不鑲嵌寶石',
-      ring_size: state.ringSize ? `${state.ringSize} 號` : '(尚未填寫)',
+      gem_name: state.gemEmbed ? (gemInfo.name + '・' + gemPosInfo.name) : '不鑲嵌寶石',
+      ring_size: state.ringSize ? (state.ringSize + ' 號') : '(尚未填寫)',
       engrave_summary: engraveSummaryText(),
       font_summary: fontSummaryText(),
-      design_image_html: designImageHtml,
-      recipient_role: '顧客送出設計圖'
+      image_base64: imgDataUrl
     };
 
-    await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams);
+    const res = await fetch(LINE_WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const result = await res.json().catch(()=>({}));
+    if(!res.ok || !result.ok){
+      throw new Error(result.error || ('status ' + res.status));
+    }
 
-    setSubmitStatus('已成功送出設計圖與訂單資訊,我們會盡快與您聯繫,謝謝!', 'ok');
+    setSubmitStatus('已成功送出設計圖與訂單資訊，我們會盡快與您聯繫，謝謝！', 'ok');
   }catch(err){
-    console.error('submitDesignByEmail failed:', err);
-    setSubmitStatus('送出時發生錯誤,請稍後再試一次,或改用下方「複製並前往 LINE」回報訂單。', 'error');
+    console.error('submitDesignByLine failed:', err);
+    setSubmitStatus('送出時發生錯誤，請稍後再試一次，或改用下方「複製並前往 LINE」回報訂單。', 'error');
   }finally{
     btn.disabled = false;
     btn.textContent = origLabel;
   }
 }
-
 /* 一鍵傳送訂單圖片到 LINE:優先使用瀏覽器原生分享(Web Share API),
    讓消費者直接從分享選單點選 LINE、選擇聊天對象後送出,圖片與文字都已經帶好,不用再手動複製貼上。
    若裝置不支援原生分享(常見於桌機瀏覽器),則退回「複製文字 + 開新分頁存圖 + 開啟官方LINE」的組合方案。 */
@@ -2563,7 +2559,6 @@ function restartAll(){
 
 renderAccordion();
 initThree();
-try{ emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY }); }catch(e){ console.error('EmailJS 初始化失敗', e); }
 </script>
 </body>
 </html>
