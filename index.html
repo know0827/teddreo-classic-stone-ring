@@ -689,6 +689,28 @@ const LINE_URL = 'https://reurl.cc/lYZj09';
    不需要改這裡的程式碼(除非要換 Worker 網址)。                                        */
 const LINE_WORKER_URL = 'https://twilight-credit-6e90.teddreo-tw.workers.dev/notify';
 const SITE_NAME = 'teddreo-classic-stone-ring';
+const LINE_LOGIN_CHANNEL_ID = '2006819384';
+const LINE_LOGIN_REDIRECT_URI = 'https://twilight-credit-6e90.teddreo-tw.workers.dev/line-login/callback';
+function getCustomerLineUid(){ return sessionStorage.getItem('teddreo_line_uid') || ''; }
+function getCustomerLineName(){ return sessionStorage.getItem('teddreo_line_name') || ''; }
+function startLineLogin(){
+  const returnUrl = location.origin + location.pathname;
+  const authUrl = 'https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=' + LINE_LOGIN_CHANNEL_ID + '&redirect_uri=' + encodeURIComponent(LINE_LOGIN_REDIRECT_URI) + '&state=' + encodeURIComponent(returnUrl) + '&scope=profile';
+  location.href = authUrl;
+}
+(function initLineLoginFromUrl(){
+  const params = new URLSearchParams(location.search);
+  const uid = params.get('line_uid');
+  const name = params.get('line_name');
+  if (uid) {
+    sessionStorage.setItem('teddreo_line_uid', uid);
+    sessionStorage.setItem('teddreo_line_name', name || '');
+    const cleanUrl = new URL(location.href);
+    cleanUrl.searchParams.delete('line_uid');
+    cleanUrl.searchParams.delete('line_name');
+    history.replaceState({}, '', cleanUrl.toString());
+  }
+})();
 
 /* 螢幕尺寸校正比例:讓寬度色條在使用者自己的裝置上顯示接近真實物理大小,
    預設 1(不調整),校正後的比例存在 localStorage,同一裝置/瀏覽器下次開啟仍會沿用 */
@@ -1884,6 +1906,9 @@ function sectionBody(id){
         <div class="action-row">
           <button class="act" onclick="downloadDesignPhoto()">下載我的設計圖</button>
         </div>
+        <div class="action-row" id="lineLoginRow">
+          <button class="act" id="lineLoginBtn" onclick="startLineLogin()">${getCustomerLineUid() ? '已使用 LINE 登入' : '使用 LINE 登入，以便接收您的設計圖'}</button>
+        </div>
         <div class="action-row">
                       <button class="act primary" id="submitDesignBtn" onclick="submitDesignByLine()">確認訂單，送出設計圖</button>
         </div>
@@ -2505,7 +2530,8 @@ const engFontName = k => (ENGRAVE_FONTS.find(f=>f.key===k)||{}).name || k;
       engrave_inner: engraveInner,
       engrave_outer: engraveOuter,
       engrave_side: engraveSide,
-      image_base64: imgDataUrl
+      image_base64: imgDataUrl,
+      customer_line_uid: getCustomerLineUid()
     };
 
     const res = await fetch(LINE_WORKER_URL, {
