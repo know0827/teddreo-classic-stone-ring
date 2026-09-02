@@ -694,6 +694,8 @@ const LINE_LOGIN_REDIRECT_URI = 'https://twilight-credit-6e90.teddreo-tw.workers
 function getCustomerLineUid(){ return sessionStorage.getItem('teddreo_line_uid') || ''; }
 function getCustomerLineName(){ return sessionStorage.getItem('teddreo_line_name') || ''; }
 function startLineLogin(){
+    try{ sessionStorage.setItem('teddreo_design_backup', JSON.stringify(state)); }catch(e){}
+    sessionStorage.setItem('teddreo_auto_submit_after_login', '1');
   const returnUrl = location.origin + location.pathname;
   const authUrl = 'https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=' + LINE_LOGIN_CHANNEL_ID + '&redirect_uri=' + encodeURIComponent(LINE_LOGIN_REDIRECT_URI) + '&state=' + encodeURIComponent(returnUrl) + '&scope=profile';
   location.href = authUrl;
@@ -2590,6 +2592,26 @@ function restartAll(){
 
 renderAccordion();
 initThree();
+
+/* LINE 登入完成導回後:還原之前暫存的設計狀態,若原本就是要自動送出設計圖,則自動幫顧客完成送出 */
+(function restoreDesignAfterLogin(){
+  const backup = sessionStorage.getItem('teddreo_design_backup');
+  const shouldAutoSubmit = sessionStorage.getItem('teddreo_auto_submit_after_login');
+  if (backup) {
+    try{ Object.assign(state, JSON.parse(backup)); }catch(e){}
+    sessionStorage.removeItem('teddreo_design_backup');
+  }
+  if (shouldAutoSubmit && getCustomerLineUid()) {
+    sessionStorage.removeItem('teddreo_auto_submit_after_login');
+    state.revealedStep = SECTIONS.length - 1;
+    state.openSection = 'confirm';
+    refreshAll();
+    setSubmitStatus('LINE 登入成功,正在為您送出設計圖...', null);
+    setTimeout(function(){ submitDesignByLine(); }, 1200);
+  } else if (backup) {
+    refreshAll();
+  }
+})();
 </script>
 </body>
 </html>
