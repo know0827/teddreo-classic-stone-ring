@@ -2529,8 +2529,7 @@ window.__isSubmittingDesign = false;
         await new Promise(r => setTimeout(r, 260));
       }
 const canvas = buildDesignPhotoCanvas();
-      if (state.engraveSideOn) { rotX = savedRotXForPhoto; }
-    const smallCanvas = document.createElement('canvas');
+      const smallCanvas = document.createElement('canvas');
     const scale = 700 / canvas.width;
     smallCanvas.width = 700;
     smallCanvas.height = Math.round(canvas.height * scale);
