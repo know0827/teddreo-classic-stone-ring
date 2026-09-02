@@ -2529,13 +2529,7 @@ window.__isSubmittingDesign = false;
         await new Promise(r => setTimeout(r, 260));
       }
 const canvas = buildDesignPhotoCanvas();
-      const smallCanvas = document.createElement('canvas');
-    const scale = 700 / canvas.width;
-    smallCanvas.width = 700;
-    smallCanvas.height = Math.round(canvas.height * scale);
-    smallCanvas.getContext('2d').drawImage(canvas, 0, 0, smallCanvas.width, smallCanvas.height);
-    const imgDataUrl = smallCanvas.toDataURL('image/jpeg', 0.85);
-
+            const imgDataUrl = canvas.toDataURL('image/png');
     const now = new Date();
     const orderNumber = BRAND_NAME.toUpperCase() + '-' + now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0') + '-' + String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0') + String(now.getSeconds()).padStart(2,'0');
     const orderTime = now.toLocaleString('zh-TW', { hour12:false });
