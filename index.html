@@ -700,6 +700,26 @@ function startLineLogin(){
   const authUrl = 'https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=' + LINE_LOGIN_CHANNEL_ID + '&redirect_uri=' + encodeURIComponent(LINE_LOGIN_REDIRECT_URI) + '&state=' + encodeURIComponent(returnUrl) + '&scope=profile';
   location.href = authUrl;
 }
+    function submitOrLoginThenSend(){
+      const name = state.customerName.trim();
+      const phone = state.customerPhone.trim();
+      if(!name){
+        setSubmitStatus('請先填寫姓名(需與訂單收件人相符)後再送出', 'error');
+        document.getElementById('customerNameInput').focus();
+        return;
+      }
+      if(!phone){
+        setSubmitStatus('請先填寫電話(需與訂單收件人相符)後再送出', 'error');
+        document.getElementById('customerPhoneInput').focus();
+        return;
+      }
+      if (getCustomerLineUid()) {
+        submitDesignByLine();
+      } else {
+        setSubmitStatus('正在為您導向 LINE 登入，請稍候...', null);
+        startLineLogin();
+      }
+    }
 (function initLineLoginFromUrl(){
   const params = new URLSearchParams(location.search);
   const uid = params.get('line_uid');
@@ -1908,11 +1928,8 @@ function sectionBody(id){
         <div class="action-row">
           <button class="act" onclick="downloadDesignPhoto()">下載我的設計圖</button>
         </div>
-        <div class="action-row" id="lineLoginRow">
-          <button class="act" id="lineLoginBtn" onclick="startLineLogin()">${getCustomerLineUid() ? '已使用 LINE 登入' : '使用 LINE 登入，以便接收您的設計圖'}</button>
-        </div>
         <div class="action-row">
-                      <button class="act primary" id="submitDesignBtn" onclick="submitDesignByLine()">確認訂單，送出設計圖</button>
+                                <button class="act primary" id="submitDesignBtn" onclick="submitOrLoginThenSend()">確認訂單，登入並送出設計圖</button>
         </div>
         <p class="notice" id="submitStatusMsg" style="display:none;"></p>
         <div class="action-row">
