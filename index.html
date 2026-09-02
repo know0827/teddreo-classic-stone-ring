@@ -2523,7 +2523,13 @@ window.__isSubmittingDesign = false;
     const gemInfo = state.gemEmbed ? GEM_COLORS.find(g=>g.key===state.gemColor) : null;
     const gemPosInfo = state.gemEmbed ? GEM_POSITIONS.find(p=>p.key===state.gemPosition) : null;
 
-    const canvas = buildDesignPhotoCanvas();
+          const savedRotXForPhoto = rotX;
+      if (state.engraveSideOn) {
+        rotX = TILT_BASE - THREE.MathUtils.degToRad(50);
+        await new Promise(r => setTimeout(r, 260));
+      }
+const canvas = buildDesignPhotoCanvas();
+      if (state.engraveSideOn) { rotX = savedRotXForPhoto; }
     const smallCanvas = document.createElement('canvas');
     const scale = 700 / canvas.width;
     smallCanvas.width = 700;
