@@ -2488,22 +2488,27 @@ function setSubmitStatus(msg, tone){
 /* 一鍵送出設計圖：驗證姓名/電話 -> 產生設計圖(壓縮成較小的 JPEG) -> 呼叫 Cloudflare Worker，
    由 Worker 負責把圖片存到 R2、並推播訂單通知(含文字資訊與圖片)到 teddreo 的 LINE。 */
 async function submitDesignByLine(){
+    if (window.__isSubmittingDesign) { return; }
+    window.__isSubmittingDesign = true;
   const name = state.customerName.trim();
   const phone = state.customerPhone.trim();
 
   if(!name){
     setSubmitStatus('請先填寫姓名(需與訂單收件人相符)後再送出', 'error');
     document.getElementById('customerNameInput').focus();
-    return;
+window.__isSubmittingDesign = false;
+            return;
   }
   if(!phone){
     setSubmitStatus('請先填寫電話(需與訂單收件人相符)後再送出', 'error');
     document.getElementById('customerPhoneInput').focus();
-    return;
+window.__isSubmittingDesign = false;
+            return;
   }
   if(!renderer || !scene || !camera){
     setSubmitStatus('3D 預覽尚未載入完成，請稍候再試', 'error');
-    return;
+window.__isSubmittingDesign = false;
+            return;
   }
 
   const btn = document.getElementById('submitDesignBtn');
@@ -2569,6 +2574,7 @@ const engFontName = k => (ENGRAVE_FONTS.find(f=>f.key===k)||{}).name || k;
     setSubmitStatus('送出時發生錯誤，請稍後再試一次，或改用下方「複製並前往 LINE」回報訂單。', 'error');
   }finally{
     btn.disabled = false;
+      window.__isSubmittingDesign = false;
     btn.textContent = origLabel;
   }
 }
