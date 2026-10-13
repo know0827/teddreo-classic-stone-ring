@@ -1758,11 +1758,12 @@ function sectionBody(id){
       const color = state[`engrave${cap(p.key)}Color`];
       const font = state[`engrave${cap(p.key)}Font`];
       const len = Array.from(text).length;
-      const disabled = p.plainOnly && state.shape!=='plain';
+      const disabledReason = engraveDisabledReason(p.key);
+      const disabled = !!disabledReason;
       return `
       <div class="field-block" style="margin-top:${idx===0?0:20}px;">
         <div class="toggle-row" style="background:${p.tint};border-color:${p.tintBorder};">
-          <div><div class="t-name">${p.name}</div><div class="t-desc">${disabled ? '僅素圈形狀可使用此刻字位置' : p.desc}</div></div>
+          <div><div class="t-name">${p.name}</div><div class="t-desc">${disabled ? disabledReason : p.desc}</div></div>
           <div class="switch ${on?'on':''} ${disabled?'disabled':''}" role="switch" tabindex="0"
                onclick="${disabled?'':`toggleEngravePos('${p.key}')`}" onkeydown="if(event.key==='Enter'){${disabled?'':`toggleEngravePos('${p.key}')`}}"></div>
         </div>
@@ -1795,7 +1796,7 @@ function sectionBody(id){
       </div>` : ''}`;
     }).join('');
     return `
-      <p class="opt-desc" style="margin-bottom:10px;">內側、外側、厚度側邊可以任選一個或多個位置,分別刻上不同文字與顏色</p>
+      <p class="opt-desc" style="margin-bottom:10px;">鑲嵌位置為「戒面正中央」時可選內側、外側刻字;鑲嵌位置為「厚度側邊」時僅能選厚度側邊刻字</p>
       ${blocks}
       <div class="efp-divider"></div>
       <div class="field-block" style="margin-top:0;">
@@ -1939,6 +1940,9 @@ function setGemPosition(key){
   state.gemPosition = key;
   /* 選擇「厚度側邊」時,自動將 3D 戒指向下轉動 50 度;切回「戒面正中央」則回到預設角度 */
   rotX = (key==='side') ? TILT_BASE - THREE.MathUtils.degToRad(50) : TILT_BASE;
+  /* 鑲嵌位置與刻字位置連動:戒面正中央→僅內側/外側刻字;厚度側邊→僅厚度側邊刻字 */
+  if(key==='side'){ state.engraveInnerOn = false; state.engraveOuterOn = false; }
+  else { state.engraveSideOn = false; }
   refreshAll();
 }
 function setFinish(key){ state.finish = key; advanceStep('finish'); refreshAll(); }
@@ -1989,7 +1993,19 @@ function setEngraveFont(pos, key){
   else state.engraveSideFont = key;
   refreshAll();
 }
+/* 回傳該刻字位置目前不可使用的原因(空字串代表可使用) */
+function engraveDisabledReason(pos){
+  const isSideGem = state.gemPosition==='side';
+  if(pos==='side'){
+    if(state.shape!=='plain') return '僅素圈形狀可使用此刻字位置';
+    if(!isSideGem) return '鑲嵌位置需選擇「厚度側邊」才能使用此刻字位置';
+    return '';
+  }
+  if(isSideGem) return '鑲嵌位置為「厚度側邊」時,僅能使用厚度側邊刻字';
+  return '';
+}
 function toggleEngravePos(pos){
+  if(engraveDisabledReason(pos)) return;
   if(pos==='inner') state.engraveInnerOn = !state.engraveInnerOn;
   else if(pos==='outer') state.engraveOuterOn = !state.engraveOuterOn;
   else state.engraveSideOn = !state.engraveSideOn;
