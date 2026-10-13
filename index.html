@@ -675,6 +675,10 @@ function startLineLogin(){
   }
 })();
 
+/* 外側刻字與戒面正中央寶石之間的間距(mm),數字愈小愈靠近寶石 */
+const OUTER_ENGRAVE_GEM_GAP_MM = 0.3;
+/* 外側刻字文字在刻字區塊內靠向寶石那一側對齊 */
+const OUTER_ENGRAVE_ALIGN = 'right';
 let state = {
   shape:'plain', previewShape:null, width:2.25,
   gemColor:'diamondwhite', gemPosition:'top', gemChosen:false, gemEmbed:true,
@@ -1261,7 +1265,7 @@ function buildStarStampTexture(){
 }
 
 /* ---- 刻字貼圖:依文字內容繪製,並依弧長計算適當弧度,避免過度拉伸 ---- */
-function buildEngraveTexture(text, colorHex, flip, fontFamily){
+function buildEngraveTexture(text, colorHex, flip, fontFamily, align){
   const w=1024, h=140;
   const c = document.createElement('canvas'); c.width=w; c.height=h;
   const ctx = c.getContext('2d');
@@ -1286,7 +1290,9 @@ function buildEngraveTexture(text, colorHex, flip, fontFamily){
   }
   /* 文字在畫布上完全自然繪製,不做任何畫布層級的翻轉;所有方向修正統一移到材質座標(UV)層級處理,
      避免像先前那樣「畫布翻轉」與「材質翻轉」兩種不同機制混用,導致彼此干擾、難以預期 */
-  let x = w/2 - totalWidth/2;
+  /* align:'left'/'right' 讓文字靠畫布某一側對齊(外側刻字用來貼近寶石),預設置中 */
+  const edgePad = w*0.02;
+  let x = (align==='left') ? edgePad : (align==='right') ? (w - edgePad - totalWidth) : (w/2 - totalWidth/2);
   ctx.textAlign = 'left';
   chars.forEach((ch,i)=>{
     ctx.fillText(ch, x, h/2);
@@ -1459,7 +1465,7 @@ function rebuildRing(){
      (state.engraveInnerAngle / state.engraveOuterAngle / state.engraveSideAngle,單位為度,0~360)。
      cylHOverride、zOffset 僅供「厚度側邊」刻字使用:讓文字只佔一小段窄帶,並沿著戒指寬度方向
      平移到剖面側邊的位置(與「厚度側邊」寶石同一條剖面弧線上) */
-  function addEngraveMesh(text, nominalRadius, colorHex, isInner, fontFamily, angleDeg, cylHOverride, zOffset, rotXOverride, rotate180, noShrink){
+  function addEngraveMesh(text, nominalRadius, colorHex, isInner, fontFamily, angleDeg, cylHOverride, zOffset, rotXOverride, rotate180, noShrink, anchorStartDeg){
     const cylH = cylHOverride || visualHalfWidth*1.3;
     let arc, textTex;
     if(noShrink){
@@ -1470,9 +1476,11 @@ function rebuildRing(){
       arc = Math.max(0.06, planeW / Math.max(0.5, nominalRadius));
     } else {
       arc = engraveArcRadians(nominalRadius, cylH);
-      textTex = buildEngraveTexture(text, colorHex, !isInner, fontFamily);
+      textTex = buildEngraveTexture(text, colorHex, !isInner, fontFamily, (anchorStartDeg!==undefined) ? OUTER_ENGRAVE_ALIGN : undefined);
     }
-    const centerDeg = angleDeg;
+    /* anchorStartDeg:指定文字弧線「起始邊」的角度,文字由此往角度增加方向延伸;
+       讓字數變多時文字只往遠離寶石的一側長,與寶石的間距固定不變 */
+    const centerDeg = (anchorStartDeg!==undefined) ? anchorStartDeg + THREE.MathUtils.radToDeg(arc)/2 : angleDeg;
     const thetaStart = THREE.MathUtils.degToRad(centerDeg) - arc/2;
     let decoOffset = 0;
     if(viewShape==='deco'){
@@ -1591,10 +1599,15 @@ function rebuildRing(){
     const outerColorHex = state.engraveOuterColor==='black' ? '#2a251f' : '#c7c2b6';
     const decoOffset = (viewShape==='deco') ? decoWaveOffset(0) : 0;
     const outerFontFam = (ENGRAVE_FONTS.find(fo=>fo.key===state.engraveOuterFont)||ENGRAVE_FONTS[0]).family;
-    /* 只有外側刻字開啟時,維持外側原本的位置;若內側刻字也同時開啟,
-       則外側改對齊內側目前的位置,讓內外刻字互相置中對齊(疊在同一個環繞角度上) */
-    const outerAngle = (state.engraveInnerOn && state.engraveInnerText) ? (state.engraveInnerAngle||0) : (state.engraveOuterAngle||0);
-    addEngraveMesh(state.engraveOuterText, MAIN_RADIUS_MM + halfThick + 0.3 + decoOffset, outerColorHex, false, outerFontFam, outerAngle, undefined, undefined, undefined, true);
+    /* 外側刻字一律使用自己的位置,不論內側刻字是否同時開啟,都與單獨開啟外側刻字時相同 */
+    const outerAngle = state.engraveOuterAngle||0;
+    const outerRadius = MAIN_RADIUS_MM + halfThick + 0.3 + decoOffset;
+    /* 外側刻字緊接在戒面正中央寶石旁邊:寶石用 bandPoint 的 90 度,換算成刻字圓柱座標為 180 度;
+       起始邊 = 寶石中心 + (寶石半徑 + 固定間距) 換算成的角度,文字再往遠離寶石的方向延伸 */
+    const outerGemR = Math.max(0.5, visualHalfWidth*0.55);
+    const outerGapMM = outerGemR + OUTER_ENGRAVE_GEM_GAP_MM;
+    const outerStartDeg = 180 + THREE.MathUtils.radToDeg(outerGapMM / outerRadius);
+    addEngraveMesh(state.engraveOuterText, outerRadius, outerColorHex, false, outerFontFam, outerAngle, undefined, undefined, undefined, true, undefined, outerStartDeg);
   }
   if(state.engraveSideOn && state.engraveSideText){
     const sideColorHex = state.engraveSideColor==='black' ? '#2a251f' : '#c7c2b6';
