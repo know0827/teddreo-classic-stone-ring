@@ -1774,7 +1774,8 @@ function sectionBody(id){
     `;
   }
   if(id==='finish'){
-    const availableFinishes = FINISHES.filter(f=>f.key==='polish'||f.key==='matte');
+    /* 「極細閃拉絲」僅平邊形狀可施作 */
+    const availableFinishes = FINISHES.filter(f=>f.key==='polish'||f.key==='matte'||(f.key==='brushline'&&state.shape==='flat'));
     return `<div class="opt-grid">${availableFinishes.map(f=>`
       <div class="opt-card ${state.finish===f.key?'selected':''}" style="padding:10px 10px;min-height:104px;display:flex;flex-direction:column;justify-content:flex-start;" tabindex="0" role="button"
            onclick="setFinish('${f.key}')" onkeydown="if(event.key==='Enter'){setFinish('${f.key}')}">
@@ -1957,6 +1958,8 @@ function setShape(key){
   /* 「厚度側邊」鑲嵌僅適用於素圈的圓潤剖面,切到其他形狀時自動改回戒面正中央 */
   if(key!=='plain' && state.gemPosition==='side') state.gemPosition = 'top';
   if(key!=='plain' && state.engraveSideOn) state.engraveSideOn = false;
+  /* 「極細閃拉絲」僅平邊可施作,切到其他形狀時自動改回亮面 */
+  if(key!=='flat' && state.finish==='brushline') state.finish = 'polish';
   advanceStep('shape'); refreshAll();
 }
 function previewShape(key){
