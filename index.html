@@ -1311,8 +1311,8 @@ function buildEngraveTexture(text, colorHex, flip, fontFamily, align){
   ctx.clearRect(0,0,w,h);
   ctx.fillStyle = colorHex;
   ctx.textBaseline = 'middle';
-  let fontSize = 80;
-  const letterGap = 5; /* 字距 5px = 字級(80)的 6.25%,與預覽框、下載設計圖一致 */
+  let fontSize = 88; /* 3D 刻字字級(原 80,放大 10%) */
+  const letterGap = fontSize*0.0625; /* 字距 = 字級的 6.25%,與預覽框、下載設計圖比例一致 */
   let gapUsed = letterGap;
   const chars = Array.from(text);
   const fam = fontFamily || "'Noto Serif TC', serif";
