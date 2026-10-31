@@ -332,7 +332,7 @@ input.text-input:focus-visible,input.text-input:focus,select.text-input:focus-vi
   padding:22px 18px;display:flex;flex-direction:column;gap:16px;
 }
 .efp-preview-row{text-align:center;}
-.efp-preview-text{font-size:21px;font-weight:700;letter-spacing:0.15em;color:var(--ink);line-height:1.4;word-break:break-word;}
+.efp-preview-text{font-size:21px;font-weight:700;letter-spacing:0.0625em;color:var(--ink);line-height:1.4;word-break:break-word;}
 .efp-preview-caption{font-size:10.5px;letter-spacing:0.04em;color:var(--ink-faint);margin:6px 0 0;}
 .efp-preview-line{height:1px;background:var(--line);}
 
@@ -1297,7 +1297,7 @@ function buildEngraveTexture(text, colorHex, flip, fontFamily, align){
   ctx.fillStyle = colorHex;
   ctx.textBaseline = 'middle';
   let fontSize = 80;
-  const letterGap = 12; /* 字距 = 字級(80)的 15%,與預覽框、下載設計圖一致 */
+  const letterGap = 5; /* 字距 5px = 字級(80)的 6.25%,與預覽框、下載設計圖一致 */
   let gapUsed = letterGap;
   const chars = Array.from(text);
   const fam = fontFamily || "'Noto Serif TC', serif";
@@ -1340,7 +1340,7 @@ function buildEngraveTexture(text, colorHex, flip, fontFamily, align){
 /* 「厚度側邊」刻字專用:字級固定不隨字數縮小,畫布寬度改成依實際文字長度動態決定,
    讓弧線長度隨字數增加而變長,而不是把字級愈壓愈小塞進固定畫布裡 */
 function buildEngraveTextureFixedSize(text, colorHex, fontFamily){
-  const h = 140, fontSize = 100, letterGap = 15, pad = 60;
+  const h = 140, fontSize = 100, letterGap = 6, pad = 60;
   const fam = fontFamily || "'Noto Serif TC', serif";
   const measureCanvas = document.createElement('canvas');
   const mctx = measureCanvas.getContext('2d');
@@ -2425,7 +2425,7 @@ function buildDesignPhotoCanvas(){
       ctx.fillStyle = r.color;
       /* 與3D戒指刻字一致:粗體700、字距0.25em,逐字繪製置中 */
       {
-        const fs0 = 27, gap0 = fs0*0.15;
+        const fs0 = 27, gap0 = fs0*0.0625;
         const chs = Array.from(r.text);
         ctx.font = `700 ${fs0}px ${r.fam}`;
         const ws = chs.map(c=>ctx.measureText(c).width);
