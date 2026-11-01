@@ -492,13 +492,13 @@ const SHAPE_ALLOWED_WIDTHS = {
   roundback: [3, 4],
   flat: [3, 4],
   deco: [3, 3.5, 4],
-  plain: [2.25, 2.7]
+  plain: [2.3, 2.7]
 };
-/* 素圈使用完全獨立的寬度選項(2.25mm、2.7mm),不與其他形狀共用標準的 2~4mm 選項;
+/* 素圈使用完全獨立的寬度選項(2.3mm、2.7mm),不與其他形狀共用標準的 2~4mm 選項;
    圓背、平邊移除了 2mm、2.5mm、3.5mm,只保留 3mm、4mm;
    其餘形狀未列在此處者,沿用預設的 WIDTHS 陣列 */
 const SHAPE_WIDTH_OPTIONS = {
-  plain: [2.25, 2.7],
+  plain: [2.3, 2.7],
   roundback: [3, 4],
   flat: [3, 4]
 };
@@ -629,8 +629,8 @@ document.addEventListener('click', function(e){
 });
 
 /* 價格(新台幣,僅為示意,請依實際成本調整) */
-const WIDTH_PRICE = {2:1580, 2.25:1630, 2.5:1680, 2.7:1720, 3:1780, 3.5:1880, 4:1980};
-/* 2.25mm、2.7mm 是依現有寬度定價的線性規律(每 +0.5mm 約 +NT$200)推算出的暫估價格,
+const WIDTH_PRICE = {2:1580, 2.3:1630, 2.5:1680, 2.7:1720, 3:1780, 3.5:1880, 4:1980};
+/* 2.3mm、2.7mm 是依現有寬度定價的線性規律(每 +0.5mm 約 +NT$200)推算出的暫估價格,
    僅為避免價格顯示 0 元的暫時數字,請確認實際報價後回報修正 */
 const SHAPE_SURCHARGE = {roundback:0, flat:0, deco:200, plain:0};
 const ENGRAVE_FREE_CHARS = 6;
@@ -718,15 +718,16 @@ function startLineLogin(){
 })();
 
 /* 外側刻字與戒面正中央寶石之間的間距(mm),數字愈小愈靠近寶石 */
-const OUTER_ENGRAVE_GEM_GAP_MM = 0.3;
+const OUTER_ENGRAVE_GEM_GAP_MM = 0.8;
 /* 外側刻字文字在刻字區塊內靠向寶石那一側對齊 */
 const OUTER_ENGRAVE_ALIGN = 'right';
 let state = {
-  shape:'plain', previewShape:null, width:2.25,
+  shape:'plain', previewShape:null, width:2.3,
   gemColor:'diamondwhite', gemPosition:'top', gemChosen:false, gemEmbed:true,
   finish:'polish',
   engraveInnerOn:false, engraveInnerText:'',
   engraveOuterOn:false, engraveOuterText:'',
+  engraveOuter2On:false, engraveOuter2Text:'', engraveOuter2Color:'silver', engraveOuter2Font:'notoserif',
   engraveSideOn:false, engraveSideText:'',
   engraveInnerColor:'silver', engraveOuterColor:'silver', engraveSideColor:'silver',
   engraveInnerFont:'specialelite', engraveOuterFont:'notoserif', engraveSideFont:'notoserif',
@@ -745,8 +746,9 @@ function calcPrice(){
   if(surcharge>0) rows.push({label:`${SHAPES.find(s=>s.key===state.shape).name}工藝加價`, amount:surcharge});
   const innerLen = state.engraveInnerOn ? Array.from(state.engraveInnerText.trim()).length : 0;
   const outerLen = state.engraveOuterOn ? Array.from(state.engraveOuterText.trim()).length : 0;
+  const outer2Len = state.engraveOuter2On ? Array.from(state.engraveOuter2Text.trim()).length : 0;
   const sideLen = state.engraveSideOn ? Array.from(state.engraveSideText.trim()).length : 0;
-  const len = innerLen + outerLen + sideLen;
+  const len = innerLen + outerLen + outer2Len + sideLen;
   const extraChars = Math.max(0, len - ENGRAVE_FREE_CHARS);
   if(extraChars>0) rows.push({label:`刻字加字(超過${ENGRAVE_FREE_CHARS}字,每字NT$${ENGRAVE_EXTRA_FEE})`, amount:extraChars*ENGRAVE_EXTRA_FEE});
   const total = rows.reduce((s,r)=>s+r.amount,0);
@@ -1421,7 +1423,7 @@ const ENGRAVE_FONT_WAIT_MS = 2000;
 let _rebuildSeq = 0, _engFontSig = '';
 function _engraveFontNeeds(){
   const need = [];
-  ['Inner','Outer','Side'].forEach(k=>{
+  ['Inner','Outer','Outer2','Side'].forEach(k=>{
     if(state['engrave'+k+'On'] && state['engrave'+k+'Text']){
       const fo = ENGRAVE_FONTS.find(f=>f.key===state['engrave'+k+'Font']) || ENGRAVE_FONTS[0];
       need.push({font:`700 40px ${fo.family}`, text:state['engrave'+k+'Text']});
@@ -1549,7 +1551,7 @@ function _rebuildRingNow(){
      (state.engraveInnerAngle / state.engraveOuterAngle / state.engraveSideAngle,單位為度,0~360)。
      cylHOverride、zOffset 僅供「厚度側邊」刻字使用:讓文字只佔一小段窄帶,並沿著戒指寬度方向
      平移到剖面側邊的位置(與「厚度側邊」寶石同一條剖面弧線上) */
-  function addEngraveMesh(text, nominalRadius, colorHex, isInner, fontFamily, angleDeg, cylHOverride, zOffset, rotXOverride, rotate180, noShrink, anchorStartDeg){
+  function addEngraveMesh(text, nominalRadius, colorHex, isInner, fontFamily, angleDeg, cylHOverride, zOffset, rotXOverride, rotate180, noShrink, anchorStartDeg, anchorEndDeg){
     const cylH = cylHOverride || visualHalfWidth*1.3;
     let arc, textTex;
     if(noShrink){
@@ -1560,11 +1562,13 @@ function _rebuildRingNow(){
       arc = Math.max(0.06, planeW / Math.max(0.5, nominalRadius));
     } else {
       arc = engraveArcRadians(nominalRadius, cylH);
-      textTex = buildEngraveTexture(text, colorHex, !isInner, fontFamily, (anchorStartDeg!==undefined) ? OUTER_ENGRAVE_ALIGN : undefined);
+      textTex = buildEngraveTexture(text, colorHex, !isInner, fontFamily, (anchorStartDeg!==undefined) ? OUTER_ENGRAVE_ALIGN : (anchorEndDeg!==undefined) ? 'left' : undefined);
     }
     /* anchorStartDeg:指定文字弧線「起始邊」的角度,文字由此往角度增加方向延伸;
        讓字數變多時文字只往遠離寶石的一側長,與寶石的間距固定不變 */
-    const centerDeg = (anchorStartDeg!==undefined) ? anchorStartDeg + THREE.MathUtils.radToDeg(arc)/2 : angleDeg;
+    /* anchorEndDeg:指定文字弧線「結束邊」的角度(主石另一側),文字由此往角度減少方向延伸 */
+    const centerDeg = (anchorStartDeg!==undefined) ? anchorStartDeg + THREE.MathUtils.radToDeg(arc)/2
+                    : (anchorEndDeg!==undefined) ? anchorEndDeg - THREE.MathUtils.radToDeg(arc)/2 : angleDeg;
     const thetaStart = THREE.MathUtils.degToRad(centerDeg) - arc/2;
     let decoOffset = 0;
     if(viewShape==='deco'){
@@ -1693,6 +1697,16 @@ function _rebuildRingNow(){
     const outerStartDeg = 180 + THREE.MathUtils.radToDeg(outerGapMM / outerRadius);
     addEngraveMesh(state.engraveOuterText, outerRadius, outerColorHex, false, outerFontFam, outerAngle, undefined, undefined, undefined, true, undefined, outerStartDeg);
   }
+  if(state.engraveOuter2On && state.engraveOuter2Text){
+    /* 主石另一側的外側刻字:與上方外側刻字對稱,結束邊緊貼寶石另一側,文字往反方向延伸 */
+    const o2ColorHex = state.engraveOuter2Color==='black' ? '#2a251f' : '#c7c2b6';
+    const o2Deco = (viewShape==='deco') ? decoWaveOffset(0) : 0;
+    const o2FontFam = (ENGRAVE_FONTS.find(fo=>fo.key===state.engraveOuterFont)||ENGRAVE_FONTS[0]).family;
+    const o2Radius = MAIN_RADIUS_MM + halfThick + 0.3 + o2Deco;
+    const o2GapMM = Math.max(0.5, visualHalfWidth*0.55) + OUTER_ENGRAVE_GEM_GAP_MM;
+    const o2EndDeg = 180 - THREE.MathUtils.radToDeg(o2GapMM / o2Radius);
+    addEngraveMesh(state.engraveOuter2Text, o2Radius, o2ColorHex, false, o2FontFam, 180, undefined, undefined, undefined, true, undefined, undefined, o2EndDeg);
+  }
   if(state.engraveSideOn && state.engraveSideText){
     const sideColorHex = state.engraveSideColor==='black' ? '#2a251f' : '#c7c2b6';
     const sideFontFam = (ENGRAVE_FONTS.find(fo=>fo.key===state.engraveSideFont)||ENGRAVE_FONTS[0]).family;
@@ -1734,7 +1748,8 @@ function engravePreviewSVG(){
   const sideFontFam = (ENGRAVE_FONTS.find(fo=>fo.key===state.engraveSideFont)||ENGRAVE_FONTS[0]).family;
   const rows = [];
   if(state.engraveInnerOn) rows.push({caption:'內側刻字', t: innerText ? escapeXML(innerText) : '(尚未填寫)', c:innerColor, fam:innerFontFam});
-  if(state.engraveOuterOn) rows.push({caption:'外側刻字', t: outerText ? escapeXML(outerText) : '(尚未填寫)', c:outerColor, fam:outerFontFam});
+  if(state.engraveOuter2On) rows.push({caption:'外側刻字(主石右側)', t: state.engraveOuter2Text ? escapeXML(state.engraveOuter2Text) : '(尚未填寫)', c:(state.engraveOuter2Color==='black' ? '#1A1A1A' : '#9C9C9C'), fam:(ENGRAVE_FONTS.find(fo=>fo.key===state.engraveOuterFont)||ENGRAVE_FONTS[0]).family});
+  if(state.engraveOuterOn) rows.push({caption:'外側刻字(主石左側)', t: outerText ? escapeXML(outerText) : '(尚未填寫)', c:outerColor, fam:outerFontFam});
   if(state.engraveSideOn) rows.push({caption:'厚度側邊刻字', t: sideText ? escapeXML(sideText) : '(尚未填寫)', c:sideColor, fam:sideFontFam});
   if(!rows.length) rows.push({caption:'', t:'尚未選擇刻字位置', c:'#a89f90', fam:"'Noto Sans TC', sans-serif"});
   const rowsHTML = rows.map((row,i)=>`
@@ -1755,7 +1770,8 @@ const SECTIONS = [
   {id:'engrave', num:'05', title:'刻字設計', summary:()=>{
     const parts = [];
     if(state.engraveInnerOn) parts.push(`內「${state.engraveInnerText||'未填寫'}」`);
-    if(state.engraveOuterOn) parts.push(`外「${state.engraveOuterText||'未填寫'}」`);
+    if(state.engraveOuterOn) parts.push(`外左「${state.engraveOuterText||'未填寫'}」`);
+    if(state.engraveOuter2On) parts.push(`外右「${state.engraveOuter2Text||'未填寫'}」`);
     if(state.engraveSideOn) parts.push(`厚度側邊「${state.engraveSideText||'未填寫'}」`);
     return parts.length ? parts.join('・') : '不刻字';
   }},
@@ -1766,7 +1782,8 @@ const SECTIONS = [
 function engraveSummaryText(){
   const parts = [];
   if(state.engraveInnerOn) parts.push(`內側:${state.engraveInnerText || '(未填寫)'}(${state.engraveInnerColor==='black'?'黑色':'原銀色'})`);
-  if(state.engraveOuterOn) parts.push(`外側:${state.engraveOuterText || '(未填寫)'}(${state.engraveOuterColor==='black'?'黑色':'原銀色'})`);
+  if(state.engraveOuterOn) parts.push(`外側(主石左側):${state.engraveOuterText || '(未填寫)'}(${state.engraveOuterColor==='black'?'黑色':'原銀色'})`);
+  if(state.engraveOuter2On) parts.push(`外側(主石右側):${state.engraveOuter2Text || '(未填寫)'}(${state.engraveOuter2Color==='black'?'黑色':'原銀色'})`);
   if(state.engraveSideOn) parts.push(`厚度側邊:${state.engraveSideText || '(未填寫)'}(${state.engraveSideColor==='black'?'黑色':'原銀色'})`);
   return parts.length ? parts.join('、') : '(不刻字)';
 }
@@ -1776,7 +1793,8 @@ function fontSummaryText(){
   const fontName = key => (ENGRAVE_FONTS.find(f=>f.key===key)||{}).name || key;
   const parts = [];
   if(state.engraveInnerOn) parts.push(`內側:${fontName(state.engraveInnerFont)}`);
-  if(state.engraveOuterOn) parts.push(`外側:${fontName(state.engraveOuterFont)}`);
+  if(state.engraveOuterOn) parts.push(`外側(主石左側):${fontName(state.engraveOuterFont)}`);
+  if(state.engraveOuter2On) parts.push(`外側(主石右側):${fontName(state.engraveOuterFont)}`);
   if(state.engraveSideOn) parts.push(`厚度側邊:${fontName(state.engraveSideFont)}`);
   return parts.length ? parts.join('、') : '(不刻字)';
 }
@@ -1847,7 +1865,8 @@ function sectionBody(id){
     const cap = s => s.charAt(0).toUpperCase()+s.slice(1);
     const ENGRAVE_UI = [
       {key:'inner', name:'內側刻字', desc:'刻於戒圈內側,配戴時貼近肌膚、僅自己看得見', placeholder:'輸入想刻在戒指內側的文字', tint:'#EEF6FA', tintBorder:'#CCE3EE'},
-      {key:'outer', name:'外側刻字', desc:'刻於戒圈外側,配戴時他人也能直接看見文字', placeholder:'輸入想刻在戒指外側的文字', tint:'#EDF7F2', tintBorder:'#C8E4D6'},
+      {key:'outer', name:'外側刻字(主石左側)', desc:'刻於戒圈外側、主石的左側,配戴時他人也能直接看見文字', placeholder:'輸入想刻在主石左側的文字', tint:'#EDF7F2', tintBorder:'#C8E4D6'},
+      {key:'outer2', name:'外側刻字(主石右側)', desc:'刻於戒圈外側、主石的右側,可與左側同時刻字', placeholder:'輸入想刻在主石右側的文字', tint:'#EDF7F2', tintBorder:'#C8E4D6'},
       {key:'side', name:'厚度側邊刻字', desc:'刻於戒指厚度側邊,位置在「厚度側邊」寶石旁邊', placeholder:'輸入想刻在戒指厚度側邊的文字', posNote:'固定在 11 點鐘方向,「厚度側邊」寶石則位於文字右側', plainOnly:true, tint:'#FBF6E9', tintBorder:'#E9DBAE'}
     ];
     const blocks = ENGRAVE_UI.map((p,idx)=>{
@@ -1880,21 +1899,23 @@ function sectionBody(id){
         <p class="opt-desc" style="margin:2px 0;">${p.posNote}</p>
       </div>` : ''}
       <div class="field-block" style="margin-top:10px;">
-        <label class="efp-label">選擇字體</label>
+        <label class="efp-label">選擇字體${(p.key==='outer'||p.key==='outer2') ? '(主石左右兩側共用)' : ''}</label>
         ${engraveFontDropdownHTML(p.key, font)}
       </div>
       <div class="field-block" style="margin-top:10px;">
         <label class="efp-label">刻字顏色</label>
         <div class="efp-color-row">
-          <div class="efp-color-option ${color==='silver'?'active':''}" onclick="setEngraveColor('${p.key}','silver')">
-            <span class="efp-color-swatch" style="background:#9C9C9C;"></span>原銀色</div>
+          ${silverLocked(p.key) ? `<div class="efp-color-option" style="opacity:0.4;cursor:not-allowed;" aria-disabled="true">
+            <span class="efp-color-swatch" style="background:#9C9C9C;"></span>原銀色</div>` : `<div class="efp-color-option ${color==='silver'?'active':''}" onclick="setEngraveColor('${p.key}','silver')">
+            <span class="efp-color-swatch" style="background:#9C9C9C;"></span>原銀色</div>`}
           <div class="efp-color-option ${color==='black'?'active':''}" onclick="setEngraveColor('${p.key}','black')">
             <span class="efp-color-swatch" style="background:#1A1A1A;"></span>黑色</div>
         </div>
+        ${silverLocked(p.key) ? `<p class="opt-desc" style="margin:6px 0 0;color:var(--ink-faint);">表面工藝為「極細閃拉絲」時,外側刻字無法使用原銀色</p>` : ''}
       </div>` : ''}`;
     }).join('');
     return `
-      <p class="opt-desc" style="margin-bottom:10px;">鑲嵌位置為「戒面正中央」時可選內側、外側刻字;鑲嵌位置為「厚度側邊」時僅能選厚度側邊刻字</p>
+      <p class="opt-desc" style="margin-bottom:10px;">鑲嵌位置為「戒面正中央」時可選內側刻字,以及主石左右兩側的外側刻字;鑲嵌位置為「厚度側邊」時僅能選厚度側邊刻字</p>
       ${blocks}
       <div class="efp-divider"></div>
       <div class="field-block" style="margin-top:0;">
@@ -2038,11 +2059,16 @@ function setGemPosition(key){
   /* 選擇「厚度側邊」時,自動將 3D 戒指向下轉動 50 度;切回「戒面正中央」則回到預設角度 */
   rotX = (key==='side') ? TILT_BASE - THREE.MathUtils.degToRad(50) : TILT_BASE;
   /* 鑲嵌位置與刻字位置連動:戒面正中央→僅內側/外側刻字;厚度側邊→僅厚度側邊刻字 */
-  if(key==='side'){ state.engraveInnerOn = false; state.engraveOuterOn = false; }
+  if(key==='side'){ state.engraveInnerOn = false; state.engraveOuterOn = false; state.engraveOuter2On = false; }
   else { state.engraveSideOn = false; }
   refreshAll();
 }
-function setFinish(key){ state.finish = key; advanceStep('finish'); refreshAll(); }
+/* 「極細閃拉絲」表面上的外側刻字(主石左右兩側)無法使用原銀色,一律改為黑色 */
+function silverLocked(pos){ return state.finish==='brushline' && (pos==='outer' || pos==='outer2'); }
+function enforceBrushlineEngraveColor(){
+  if(state.finish==='brushline'){ state.engraveOuterColor = 'black'; state.engraveOuter2Color = 'black'; }
+}
+function setFinish(key){ state.finish = key; enforceBrushlineEngraveColor(); advanceStep('finish'); refreshAll(); }
 function setRingSize(val){
   /* 限制在 2-27 號範圍內,避免輸入超出實際可製作的尺寸區間 */
   if(val !== ''){
@@ -2079,14 +2105,16 @@ function updateReportCardVisibility(){
   if(placeholder) placeholder.style.display = ready ? 'none' : '';
 }
 function setEngraveColor(pos, c){
+  if(c==='silver' && silverLocked(pos)) return;
   if(pos==='inner') state.engraveInnerColor = c;
   else if(pos==='outer') state.engraveOuterColor = c;
+  else if(pos==='outer2') state.engraveOuter2Color = c;
   else state.engraveSideColor = c;
   refreshAll();
 }
 function setEngraveFont(pos, key){
   if(pos==='inner') state.engraveInnerFont = key;
-  else if(pos==='outer') state.engraveOuterFont = key;
+  else if(pos==='outer' || pos==='outer2'){ state.engraveOuterFont = key; state.engraveOuter2Font = key; } /* 外側刻字主石左右兩側共用同一種字體 */
   else state.engraveSideFont = key;
   refreshAll();
 }
@@ -2105,6 +2133,7 @@ function toggleEngravePos(pos){
   if(engraveDisabledReason(pos)) return;
   if(pos==='inner') state.engraveInnerOn = !state.engraveInnerOn;
   else if(pos==='outer') state.engraveOuterOn = !state.engraveOuterOn;
+  else if(pos==='outer2') state.engraveOuter2On = !state.engraveOuter2On;
   else state.engraveSideOn = !state.engraveSideOn;
   refreshAll();
 }
@@ -2137,6 +2166,14 @@ function setEngraveOuterText(val){
   state.engraveOuterText = val;
   rebuildRing();
   const cc = document.querySelector('#engraveOuterInput + .efp-charcount');
+  if(cc){ const n=Array.from(val).length; cc.textContent = `${n} / ${ENGRAVE_MAX_CHARS}`; cc.className = 'efp-charcount' + (n>ENGRAVE_MAX_CHARS?' over':''); }
+  const ep = document.getElementById('engravePreview');
+  if(ep) ep.innerHTML = engravePreviewSVG();
+}
+function setEngraveOuter2Text(val){
+  state.engraveOuter2Text = val;
+  rebuildRing();
+  const cc = document.querySelector('#engraveOuter2Input + .efp-charcount');
   if(cc){ const n=Array.from(val).length; cc.textContent = `${n} / ${ENGRAVE_MAX_CHARS}`; cc.className = 'efp-charcount' + (n>ENGRAVE_MAX_CHARS?' over':''); }
   const ep = document.getElementById('engravePreview');
   if(ep) ep.innerHTML = engravePreviewSVG();
@@ -2335,7 +2372,7 @@ function buildDesignPhotoCanvas(){
   const orderColH = orderRows.length*rowH;
   /* 刻字欄位框高需依實際刻字位置數量(內側/外側/厚度側邊,最多3條)動態調整,
      避免固定高度不夠、導致第三條刻字文字被切到框外 */
-  const engraveRowCount = [state.engraveInnerOn, state.engraveOuterOn, state.engraveSideOn].filter(Boolean).length;
+  const engraveRowCount = [state.engraveInnerOn, state.engraveOuterOn, state.engraveOuter2On, state.engraveSideOn].filter(Boolean).length;
   const engraveH = 210 + Math.max(0, engraveRowCount-2)*100;
   const colBlockH = Math.max(orderColH, engraveH);
   const footerH = 20;
@@ -2417,8 +2454,13 @@ function buildDesignPhotoCanvas(){
     fam: (ENGRAVE_FONTS.find(fo=>fo.key===state.engraveInnerFont)||ENGRAVE_FONTS[0]).family
   });
   if(state.engraveOuterOn) engraveRows.push({
-    label:'外側刻字', text: state.engraveOuterText || '(尚未填寫)',
+    label:'外側刻字(主石左側)', text: state.engraveOuterText || '(尚未填寫)',
     color: state.engraveOuterColor==='black' ? '#2a251f' : '#9c9690',
+    fam: (ENGRAVE_FONTS.find(fo=>fo.key===state.engraveOuterFont)||ENGRAVE_FONTS[0]).family
+  });
+  if(state.engraveOuter2On) engraveRows.push({
+    label:'外側刻字(主石右側)', text: state.engraveOuter2Text || '(尚未填寫)',
+    color: state.engraveOuter2Color==='black' ? '#2a251f' : '#9c9690',
     fam: (ENGRAVE_FONTS.find(fo=>fo.key===state.engraveOuterFont)||ENGRAVE_FONTS[0]).family
   });
   if(state.engraveSideOn) engraveRows.push({
@@ -2561,7 +2603,9 @@ const canvas = buildDesignPhotoCanvas();
 const engFontName = k => (ENGRAVE_FONTS.find(f=>f.key===k)||{}).name || k;
       const engColorName = c => c==='black' ? '黑色' : '銀色';
       const engraveInner = state.engraveInnerOn ? (state.engraveInnerText || '(未填寫)') + '（' + engFontName(state.engraveInnerFont) + '・' + engColorName(state.engraveInnerColor) + '）' : '';
-      const engraveOuter = state.engraveOuterOn ? (state.engraveOuterText || '(未填寫)') + '（' + engFontName(state.engraveOuterFont) + '・' + engColorName(state.engraveOuterColor) + '）' : '';
+      const engraveOuterL = state.engraveOuterOn ? '左:' + (state.engraveOuterText || '(未填寫)') + '（' + engFontName(state.engraveOuterFont) + '・' + engColorName(state.engraveOuterColor) + '）' : '';
+      const engraveOuterR = state.engraveOuter2On ? '右:' + (state.engraveOuter2Text || '(未填寫)') + '（' + engFontName(state.engraveOuterFont) + '・' + engColorName(state.engraveOuter2Color) + '）' : '';
+      const engraveOuter = [engraveOuterL, engraveOuterR].filter(Boolean).join(' ／ ');
       const engraveSide = state.engraveSideOn ? (state.engraveSideText || '(未填寫)') + '（' + engFontName(state.engraveSideFont) + '・' + engColorName(state.engraveSideColor) + '）' : '';
     const payload = {
       site: SITE_NAME,
@@ -2624,8 +2668,8 @@ function shareOrderToLine(){
 
 function restartAll(){
   state = {
-    shape:'plain', previewShape:null, width:2.25, gemColor:'diamondwhite', gemPosition:'top', gemChosen:false, gemEmbed:true,
-    finish:'polish', engraveInnerOn:false, engraveInnerText:'', engraveOuterOn:false, engraveOuterText:'', engraveSideOn:false, engraveSideText:'',
+    shape:'plain', previewShape:null, width:2.3, gemColor:'diamondwhite', gemPosition:'top', gemChosen:false, gemEmbed:true,
+    finish:'polish', engraveInnerOn:false, engraveInnerText:'', engraveOuterOn:false, engraveOuterText:'', engraveOuter2On:false, engraveOuter2Text:'', engraveOuter2Color:'silver', engraveOuter2Font:'notoserif', engraveSideOn:false, engraveSideText:'',
     engraveInnerColor:'silver', engraveOuterColor:'silver', engraveSideColor:'silver',
     engraveInnerFont:'specialelite', engraveOuterFont:'notoserif', engraveSideFont:'notoserif',
     engraveInnerAngle:0, engraveOuterAngle:210, engraveSideAngle:102,
@@ -2645,7 +2689,7 @@ initThree();
   const backup = storeGet('teddreo_design_backup', LOGIN_BACKUP_MAX_MS);
   const shouldAutoSubmit = storeGet('teddreo_auto_submit_after_login', LOGIN_BACKUP_MAX_MS);
   if (backup) {
-    try{ Object.assign(state, JSON.parse(backup)); }catch(e){}
+    try{ Object.assign(state, JSON.parse(backup)); enforceBrushlineEngraveColor(); }catch(e){}
     storeDel('teddreo_design_backup');
   }
   if (window.__lineJustLoggedIn && !backup) {
